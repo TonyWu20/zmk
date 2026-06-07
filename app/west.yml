@@ -9,7 +9,7 @@ manifest:
   projects:
     - name: zephyr
       remote: petejohanson
-      revision: v4.1.0+zmk-fixes-lll-cherry-pick
+      revision: v4.1.0+zmk-fixes-cherry-pick-selective
       clone-depth: 1
       import:
         name-blocklist:
