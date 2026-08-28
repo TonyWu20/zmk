@@ -10,8 +10,7 @@
 #include <zmk/endpoints.h>
 
 struct zmk_pointing_resolution_multipliers {
-    uint8_t wheel;
-    uint8_t hor_wheel;
+    uint8_t resolution;
 };
 
 struct zmk_pointing_resolution_multipliers

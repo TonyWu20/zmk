@@ -182,8 +182,7 @@ static ssize_t read_hids_mouse_feature_report(struct bt_conn *conn,
         zmk_pointing_resolution_multipliers_get_profile(endpoint);
 
     struct zmk_hid_mouse_resolution_feature_report_body report = {
-        .wheel_res = mult.wheel,
-        .hwheel_res = mult.hor_wheel,
+        .resolution = mult.resolution,
     };
 
     return bt_gatt_attr_read(conn, attr, buf, len, offset, &report,

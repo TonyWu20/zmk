@@ -74,8 +74,8 @@ static int get_report_cb(const struct device *dev, struct usb_setup_packet *setu
             struct zmk_pointing_resolution_multipliers mult =
                 zmk_pointing_resolution_multipliers_get_profile(endpoint);
 
-            res_feature_report.body.wheel_res = mult.wheel;
-            res_feature_report.body.hwheel_res = mult.hor_wheel;
+            res_feature_report.body.resolution = mult.resolution;
+            res_feature_report.body._reserved = 0;
             *data = (uint8_t *)&res_feature_report;
             break;
 #endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
