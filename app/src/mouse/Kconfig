@@ -12,3 +12,15 @@ config ZMK_POINTING_SMOOTH_SCROLLING
     default n
     help
       Enable smooth scrolling, with hosts that support HID Resolution Multipliers
+
+config ZMK_POINTING_SMOOTH_SCROLL_DIVISOR
+    int "Smooth Scrolling device-side divisor"
+    depends on ZMK_POINTING_SMOOTH_SCROLLING
+    default 32
+    range 1 256
+    help
+      Divisor for fine-grained wheel events sent by the device. One host step
+      is sent per this many sensor pixels, with the remainder carried over
+      between events. 32 matches the legacy CONFIG_PMW3610_SCROLL_TICK=32
+      speed. Lower the value for a more sensitive trackball. A host that
+      writes HID resolution multipliers scales on top of this divisor.

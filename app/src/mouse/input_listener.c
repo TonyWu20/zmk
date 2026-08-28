@@ -159,25 +159,26 @@ static void clear_xy_data(struct input_listener_xy_data *data) {
 #if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
 static void apply_resolution_scaling(struct input_listener_data *data, struct input_event *evt) {
     int16_t *remainder;
-    uint8_t div;
+    uint8_t mult;
 
     switch (evt->code) {
     case INPUT_REL_WHEEL:
         remainder = &data->wheel_remainder;
-        div = (16 - zmk_pointing_resolution_multipliers_get_current_profile().wheel);
+        mult = zmk_pointing_resolution_multipliers_get_current_profile().wheel;
         break;
     case INPUT_REL_HWHEEL:
         remainder = &data->h_wheel_remainder;
-        div = (16 - zmk_pointing_resolution_multipliers_get_current_profile().hor_wheel);
+        mult = zmk_pointing_resolution_multipliers_get_current_profile().hor_wheel;
         break;
     default:
         return;
     }
 
-    int16_t val = evt->value + *remainder;
-    int16_t scaled = val / (int16_t)div;
-    *remainder = val - (scaled * (int16_t)div);
-    evt->value = val;
+    int32_t val = evt->value + *remainder;
+    int32_t div = CONFIG_ZMK_POINTING_SMOOTH_SCROLL_DIVISOR * (int32_t)(16 - mult);
+    int32_t scaled = val / div;
+    *remainder = val - (scaled * div);
+    evt->value = (int16_t)scaled;
 }
 #endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
 
