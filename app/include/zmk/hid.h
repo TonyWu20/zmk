@@ -185,6 +185,22 @@ static const uint8_t zmk_hid_report_desc[] = {
     HID_REPORT_SIZE(0x08),
     HID_REPORT_COUNT(0x01),
     HID_INPUT(ZMK_HID_MAIN_VAL_DATA | ZMK_HID_MAIN_VAL_VAR | ZMK_HID_MAIN_VAL_REL),
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+    HID_USAGE_PAGE(HID_USAGE_GD),
+    HID_USAGE(HID_USAGE_GD_RESOLUTION_MULTIPLIER),
+    HID_LOGICAL_MIN8(0x00),
+    HID_LOGICAL_MAX8(0x0F),
+    HID_REPORT_SIZE(0x04),
+    HID_REPORT_COUNT(0x01),
+    HID_FEATURE(ZMK_HID_MAIN_VAL_DATA | ZMK_HID_MAIN_VAL_VAR | ZMK_HID_MAIN_VAL_ABS),
+    HID_USAGE_PAGE(HID_USAGE_GD),
+    HID_USAGE(HID_USAGE_GD_RESOLUTION_MULTIPLIER),
+    HID_LOGICAL_MIN8(0x00),
+    HID_LOGICAL_MAX8(0x0F),
+    HID_REPORT_SIZE(0x04),
+    HID_REPORT_COUNT(0x01),
+    HID_FEATURE(ZMK_HID_MAIN_VAL_DATA | ZMK_HID_MAIN_VAL_VAR | ZMK_HID_MAIN_VAL_ABS),
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
     HID_END_COLLECTION,
     HID_END_COLLECTION,
 #endif // IS_ENABLED(CONFIG_ZMK_MOUSE)
@@ -263,6 +279,20 @@ struct zmk_hid_mouse_report {
     uint8_t report_id;
     struct zmk_hid_mouse_report_body body;
 } __packed;
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+
+struct zmk_hid_mouse_resolution_feature_report_body {
+    uint8_t wheel_res : 4;
+    uint8_t hwheel_res : 4;
+} __packed;
+
+struct zmk_hid_mouse_resolution_feature_report {
+    uint8_t report_id;
+    struct zmk_hid_mouse_resolution_feature_report_body body;
+} __packed;
+
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
 
 #endif // IS_ENABLED(CONFIG_ZMK_MOUSE)
 

@@ -6,3 +6,9 @@ config ZMK_MOUSE
     select INPUT
     select INPUT_THREAD_PRIORITY_OVERRIDE
 
+config ZMK_POINTING_SMOOTH_SCROLLING
+    bool "Smooth Scrolling"
+    depends on ZMK_MOUSE
+    default n
+    help
+      Enable smooth scrolling, with hosts that support HID Resolution Multipliers

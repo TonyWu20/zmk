@@ -19,6 +19,10 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 #include <zmk/mouse.h>
 #include <zmk/hid.h>
 
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+#include <zmk/pointing/resolution_multipliers.h>
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+
 #define ONE_IF_DEV_OK(n)                                                                           \
     COND_CODE_1(DT_NODE_HAS_STATUS(DT_INST_PHANDLE(n, device), okay), (1 +), (0 +))
 
@@ -48,6 +52,11 @@ struct input_listener_data {
             uint8_t button_clear;
         } mouse;
     };
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+    int16_t wheel_remainder;
+    int16_t h_wheel_remainder;
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
 };
 
 struct input_listener_config {
@@ -147,10 +156,39 @@ static void clear_xy_data(struct input_listener_xy_data *data) {
     data->mode = INPUT_LISTENER_XY_DATA_MODE_NONE;
 }
 
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+static void apply_resolution_scaling(struct input_listener_data *data, struct input_event *evt) {
+    int16_t *remainder;
+    uint8_t div;
+
+    switch (evt->code) {
+    case INPUT_REL_WHEEL:
+        remainder = &data->wheel_remainder;
+        div = (16 - zmk_pointing_resolution_multipliers_get_current_profile().wheel);
+        break;
+    case INPUT_REL_HWHEEL:
+        remainder = &data->h_wheel_remainder;
+        div = (16 - zmk_pointing_resolution_multipliers_get_current_profile().hor_wheel);
+        break;
+    default:
+        return;
+    }
+
+    int16_t val = evt->value + *remainder;
+    int16_t scaled = val / (int16_t)div;
+    *remainder = val - (scaled * (int16_t)div);
+    evt->value = val;
+}
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+
 static void input_handler(const struct input_listener_config *config,
                           struct input_listener_data *data, struct input_event *evt) {
     // First, filter to update the event data as needed.
     filter_with_input_config(config, evt);
+
+#if IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
+    apply_resolution_scaling(data, evt);
+#endif // IS_ENABLED(CONFIG_ZMK_POINTING_SMOOTH_SCROLLING)
 
     switch (evt->type) {
     case INPUT_EV_REL:
