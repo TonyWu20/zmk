@@ -79,6 +79,100 @@ void peripheral_event_work_callback(struct k_work *work) {
 
 K_WORK_DEFINE(peripheral_event_work, peripheral_event_work_callback);
 
+int peripheral_slot_index_for_conn(struct bt_conn *conn);
+struct peripheral_slot *peripheral_slot_for_conn(struct bt_conn *conn);
+
+#if CONFIG_ZMK_SPLIT_BLE_POS_RESYNC_MS > 0
+/*
+ * Position state resync: periodically re-read each peripheral's position
+ * state characteristic and reconcile it against the central's copy. This
+ * corrects stale central key state left behind by a lost BLE notification,
+ * for example a key release that never arrived. Reconciled state raises the
+ * same position state change events as a normal notification, and the keymap
+ * event guard (if enabled) still filters the result.
+ */
+static uint8_t split_central_resync_read_func(struct bt_conn *conn, uint8_t err,
+                                               struct bt_gatt_read_params *params,
+                                               const void *data, uint16_t length) {
+    struct peripheral_slot *slot = peripheral_slot_for_conn(conn);
+
+    if (slot == NULL) {
+        LOG_ERR("No peripheral state found for resync read");
+        return BT_GATT_ITER_STOP;
+    }
+
+    if (err) {
+        LOG_DBG("Position state resync read failed (err %u)", err);
+        return BT_GATT_ITER_STOP;
+    }
+
+    if (data == NULL || length != POSITION_STATE_DATA_LEN) {
+        return BT_GATT_ITER_STOP;
+    }
+
+    for (int i = 0; i < POSITION_STATE_DATA_LEN; i++) {
+        uint8_t changed = ((uint8_t *)data)[i] ^ slot->position_state[i];
+        slot->position_state[i] = ((uint8_t *)data)[i];
+
+        for (int j = 0; j < 8; j++) {
+            if (changed & BIT(j)) {
+                uint32_t position = (i * 8) + j;
+                bool pressed = slot->position_state[i] & BIT(j);
+                struct zmk_position_state_changed ev = {.source =
+                                                            peripheral_slot_index_for_conn(conn),
+                                                        .position = position,
+                                                        .state = pressed,
+                                                        .timestamp = k_uptime_get()};
+
+                LOG_WRN("Resync corrected position %u to %s", position, pressed ? "pressed"
+                                                                                : "released");
+                k_msgq_put(&peripheral_event_msgq, &ev, K_NO_WAIT);
+                k_work_submit(&peripheral_event_work);
+            }
+        }
+    }
+
+    return BT_GATT_ITER_STOP;
+}
+
+static void split_central_resync_work(struct k_work *work) {
+    struct k_work_delayable *dwork = k_work_delayable_from_work(work);
+
+    for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
+        struct peripheral_slot *slot = &peripherals[i];
+
+        if (slot->state != PERIPHERAL_SLOT_STATE_CONNECTED ||
+            !slot->subscribe_params.value_handle) {
+            continue;
+        }
+
+        struct bt_gatt_read_params read_params = {
+            .func = split_central_resync_read_func,
+            .handle_count = 1,
+            .single.handle = slot->subscribe_params.value_handle,
+            .single.offset = 0,
+        };
+
+        int err = bt_gatt_read(slot->conn, &read_params);
+        if (err) {
+            LOG_DBG("Position state resync read did not start (err %d)", err);
+        }
+    }
+
+    k_work_reschedule(dwork, K_MSEC(CONFIG_ZMK_SPLIT_BLE_POS_RESYNC_MS));
+}
+
+K_WORK_DELAYABLE_DEFINE(split_central_resync_workitem, split_central_resync_work);
+
+static void split_central_resync_schedule(void) {
+    k_work_reschedule(&split_central_resync_workitem,
+                      K_MSEC(CONFIG_ZMK_SPLIT_BLE_POS_RESYNC_MS));
+}
+#else
+static void split_central_resync_schedule(void) {
+}
+#endif // CONFIG_ZMK_SPLIT_BLE_POS_RESYNC_MS > 0
+
 int peripheral_slot_index_for_conn(struct bt_conn *conn) {
     for (int i = 0; i < ZMK_SPLIT_BLE_PERIPHERAL_COUNT; i++) {
         if (peripherals[i].conn == conn) {
@@ -713,6 +807,7 @@ static void split_central_connected(struct bt_conn *conn, uint8_t conn_err) {
 
     confirm_peripheral_slot_conn(conn);
     split_central_process_connection(conn);
+    split_central_resync_schedule();
 }
 
 static void split_central_disconnected(struct bt_conn *conn, uint8_t reason) {

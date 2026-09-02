@@ -464,6 +464,35 @@ config ZMK_COMBO_MAX_KEYS_PER_COMBO
 #Combo options
 endmenu
 
+menu "Key event protection"
+
+config ZMK_KEY_EVENT_GUARD
+    bool "Guard against abnormal repeated key events"
+    default n
+    help
+      Filters key position events before they reach the keymap. A press
+      event is dropped when the position is already pressed, when it
+      arrives less than ZMK_KEY_EVENT_GUARD_MIN_INTERVAL_MS after the
+      previous press of the same position, or when a release arrives
+      for a position that is not pressed.
+
+      This protects against switch chatter from aging switches, and
+      against duplicated position events caused by an unstable BLE
+      split link.
+
+config ZMK_KEY_EVENT_GUARD_MIN_INTERVAL_MS
+    int "Minimum interval between two presses of the same key (ms)"
+    default 40
+    depends on ZMK_KEY_EVENT_GUARD
+    help
+      A press event on a position that was last pressed less than this
+      many milliseconds ago is dropped. A human cannot press the same
+      key twice within this window, so such events are chatter or
+      link noise. Use 0 to disable the interval check and keep only
+      the duplicate press and phantom release filters.
+
+endmenu
+
 menu "Behavior Options"
 
 config ZMK_BEHAVIORS_QUEUE_SIZE

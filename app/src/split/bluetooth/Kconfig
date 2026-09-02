@@ -70,6 +70,18 @@ config ZMK_SPLIT_BLE_PREF_TIMEOUT
     int "Supervision timeout to use for split central/peripheral connection"
     default 400
 
+config ZMK_SPLIT_BLE_POS_RESYNC_MS
+    int "Periodically re-read peripheral position state interval in ms (0 disables)"
+    default 0
+    help
+      When set to a positive value, the central re-reads each connected
+      peripheral's position state characteristic at this interval and
+      reconciles it against its own copy. This corrects stale key state
+      left behind by a lost BLE notification, such as a key release that
+      never arrived, so a stuck repeated key press is released.
+
+      Set to 0 to disable. Values below 250 ms add measurable BLE traffic.
+
 endif # ZMK_SPLIT_ROLE_CENTRAL
 
 if !ZMK_SPLIT_ROLE_CENTRAL

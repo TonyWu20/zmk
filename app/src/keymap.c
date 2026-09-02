@@ -29,6 +29,57 @@ LOG_MODULE_DECLARE(zmk, CONFIG_ZMK_LOG_LEVEL);
 static zmk_keymap_layers_state_t _zmk_keymap_layer_state = 0;
 static uint8_t _zmk_keymap_layer_default = 0;
 
+/*
+ * Key event guard: per-position press/release latch that filters abnormal
+ * repeated key events before they reach the keymap. See CONFIG_ZMK_KEY_EVENT_GUARD.
+ */
+#if IS_ENABLED(CONFIG_ZMK_KEY_EVENT_GUARD)
+struct key_event_guard_state {
+    bool pressed;
+    int64_t last_press_timestamp;
+};
+
+static struct key_event_guard_state key_event_guard[ZMK_KEYMAP_LEN];
+
+static bool zmk_key_event_guard_check(uint32_t position, bool pressed, int64_t timestamp) {
+    // Sensor and combo positions are virtual and do not have a physical
+    // switch; they are not guarded.
+    if (position >= ZMK_KEYMAP_LEN) {
+        return true;
+    }
+
+    struct key_event_guard_state *state = &key_event_guard[position];
+
+    if (pressed) {
+        if (state->pressed) {
+            LOG_WRN("guard: drop duplicate press on position %u", position);
+            return false;
+        }
+
+        if (CONFIG_ZMK_KEY_EVENT_GUARD_MIN_INTERVAL_MS > 0 &&
+            state->last_press_timestamp > 0 &&
+            (timestamp - state->last_press_timestamp) <
+                CONFIG_ZMK_KEY_EVENT_GUARD_MIN_INTERVAL_MS) {
+            LOG_WRN("guard: drop press on position %u within %d ms of last press", position,
+                    CONFIG_ZMK_KEY_EVENT_GUARD_MIN_INTERVAL_MS);
+            return false;
+        }
+
+        state->pressed = true;
+        state->last_press_timestamp = timestamp;
+        return true;
+    }
+
+    if (!state->pressed) {
+        LOG_WRN("guard: drop release on position %u with no active press", position);
+        return false;
+    }
+
+    state->pressed = false;
+    return true;
+}
+#endif // IS_ENABLED(CONFIG_ZMK_KEY_EVENT_GUARD)
+
 #define DT_DRV_COMPAT zmk_keymap
 
 #if !DT_NODE_EXISTS(DT_DRV_INST(0))
@@ -233,6 +284,11 @@ int zmk_keymap_apply_position_state(uint8_t source, int layer, uint32_t position
 
 int zmk_keymap_position_state_changed(uint8_t source, uint32_t position, bool pressed,
                                       int64_t timestamp) {
+#if IS_ENABLED(CONFIG_ZMK_KEY_EVENT_GUARD)
+    if (!zmk_key_event_guard_check(position, pressed, timestamp)) {
+        return 0;
+    }
+#endif
     if (pressed) {
         zmk_keymap_active_behavior_layer[position] = _zmk_keymap_layer_state;
     }
