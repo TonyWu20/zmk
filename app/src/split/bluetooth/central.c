@@ -58,6 +58,12 @@ struct peripheral_slot {
 #endif // IS_ENABLED(CONFIG_ZMK_SPLIT_PERIPHERAL_HID_INDICATORS)
     uint8_t position_state[POSITION_STATE_DATA_LEN];
     uint8_t changed_positions[POSITION_STATE_DATA_LEN];
+#if CONFIG_ZMK_SPLIT_BLE_POS_RESYNC_MS > 0
+    /* Persistent read params: the GATT read response callback runs later,
+     * in the Bluetooth work queue, and dereferences this struct. It must
+     * outlive the resync work item that starts the read. */
+    struct bt_gatt_read_params pos_resync_read_params;
+#endif
 };
 
 static struct peripheral_slot peripherals[ZMK_SPLIT_BLE_PERIPHERAL_COUNT];
@@ -146,14 +152,14 @@ static void split_central_resync_work(struct k_work *work) {
             continue;
         }
 
-        struct bt_gatt_read_params read_params = {
-            .func = split_central_resync_read_func,
-            .handle_count = 1,
-            .single.handle = slot->subscribe_params.value_handle,
-            .single.offset = 0,
-        };
+        struct bt_gatt_read_params *read_params = &slot->pos_resync_read_params;
 
-        int err = bt_gatt_read(slot->conn, &read_params);
+        read_params->func = split_central_resync_read_func;
+        read_params->handle_count = 1;
+        read_params->single.handle = slot->subscribe_params.value_handle;
+        read_params->single.offset = 0;
+
+        int err = bt_gatt_read(slot->conn, read_params);
         if (err) {
             LOG_DBG("Position state resync read did not start (err %d)", err);
         }
